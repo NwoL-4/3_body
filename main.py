@@ -9,6 +9,7 @@ from numpy import zeros, sum, array, arange, where, ndarray, abs, sqrt, append, 
 from numpy.linalg import norm
 from scipy.constants import G, c
 from tqdm import tqdm
+import pyinstaller
 
 
 def rk4(time_step: float, mass_coord: ndarray, mass_speed: ndarray, function, time_rk4: float):
