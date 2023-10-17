@@ -4,9 +4,8 @@ from os import path, makedirs, chdir, getcwd
 from typing import Union
 
 import matplotlib.pyplot as plt
-import numpy as np
 from numba import prange, njit
-from numpy import zeros, sum, array, arange, where, ndarray, abs, append, savez, load, min, zeros_like, int64
+from numpy import zeros, sum, array, arange, where, ndarray, abs, append, savez, load, min, int64
 from numpy.linalg import norm
 from scipy.constants import G, c
 from tqdm import tqdm
@@ -192,7 +191,7 @@ if __name__ == '__main__':
     print('Загрузка завершена....................................\n'
           'Идет визуализация....................................')
 
-    index_slice = np.arange(0, list_coordinate.shape[0], step=slice_list)
+    index_slice = arange(0, list_coordinate.shape[0], step=slice_list)
 
     fig = plt.figure(figsize=(15, 10))
     anim(coord=list_coordinate, index_range=index_slice)

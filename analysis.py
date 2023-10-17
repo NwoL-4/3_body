@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from os import listdir, chdir, getcwd, path
 
-from numpy import arange, load, ndarray, zeros, zeros_like, transpose
+from numpy import arange, load, ndarray, zeros, transpose
 from pick import pick
 from tqdm import tqdm
 
@@ -11,8 +11,8 @@ def load_file(file_name) -> tuple[ndarray, ndarray]:
     return file['arr_0'], file['arr_1']
 
 
-def anim(coord):
-    for i in tqdm(range(0, len(list_coordinate) - 2), ):
+def anim(coord, index_range):
+    for i in tqdm(index_range):
         fig.clf()
         ax = fig.add_subplot(111, projection="3d")
         ax.set_title("Визуализация задачи 3-ех тел с учетом запаздывания сигнала методом РК-4\n", fontsize=14)
@@ -32,7 +32,7 @@ def anim(coord):
         plt.pause(0.000000001)
 
 
-route: str = "C:\\Users\\NwoL"
+route: str = getcwd()
 
 chdir(f'{route}')
 
@@ -60,29 +60,26 @@ print(f'Число итераций: {settings["NoI"]}\n'
       f'Начальные координаты 2 планеты: {transpose(settings["initial_coordinate"])[1]}\n'
       f'Начальные координаты 3 планеты: {transpose(settings["initial_coordinate"])[2]}\n')
 
+
 frame_step = int(settings["dt"])
 
 slice_list = int(input('\nВведите периодичность вывода кадров (больше - быстрее отрисовывает) type=int '))
+frame_steps = arange(0, (len(listdir()) - 1) * frame_step, frame_step)
 
-frame_steps = arange(0, (len(listdir()) - 1) * frame_step, frame_step)[::slice_list]
+list_coordinate = zeros((len(frame_steps + 1), 3, 3))
 
-list_coordinate = zeros((len(frame_steps + 2), 3, 3))
-
-list_speed = zeros_like(list_coordinate)
-coordinate, speed = load_file(f'{-1}.npz')
-
-list_coordinate[0, :, :] = coordinate
-list_speed[0, :, :] = speed
+list_coordinate[0, :, :] = load_file(f'{-1}.npz')[0]
 
 print('\n')
-
+print('Загрузка данных....................................\n')
 for frame in tqdm(range(len(frame_steps) - 1)):
-    coordinate, speed = load_file(f'{frame_steps[frame]}.npz')
-    list_coordinate[frame + 1, :, :] = coordinate
-    list_speed[frame + 1, :, :] = speed
+    list_coordinate[frame + 1, :, :] = load_file(f'{frame_steps[frame]}.npz')[0]
 
-print('\nИдет визуализация....................................')
+print('Загрузка завершена....................................\n'
+      'Идет визуализация....................................')
+
+index_slice = arange(0, list_coordinate.shape[0], step=slice_list)
 
 fig = plt.figure(figsize=(15, 10))
-anim(list_coordinate)
+anim(coord=list_coordinate, index_range=index_slice)
 plt.show()
