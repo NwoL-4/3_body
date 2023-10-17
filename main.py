@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
     savez(f'{int(-1)}', coordinate, speed)
 
-    print('------------------------ Идет просчет ------------------------\n')
+    print('------------------------ Идет просчет ------------------------')
 
     for frame in tqdm(arange(len(timeline))):
         if frame == range(len(timeline))[-1]:
@@ -182,19 +182,15 @@ if __name__ == '__main__':
 
     list_coordinate = zeros((len(frame_steps) + 1, 3, 3))
 
-    list_speed = zeros_like(list_coordinate)
-    coordinate, speed = load_npz(f'{-1}.npz')
-
-    list_coordinate[0, :, :] = coordinate
-    list_speed[0, :, :] = speed
+    list_coordinate[0, :, :] = load_npz(f'{-1}.npz')[0]
 
     print('\n')
-
+    print('Загрузка данных....................................\n')
     for frame in tqdm(prange(len(frame_steps) - 1)):
-        coordinate, speed = load_npz(f'{frame_steps[frame]}.npz')
-        list_coordinate[frame + 1, :, :] = coordinate
-        list_speed[frame + 1, :, :] = speed
-    print('\nИдет визуализация....................................')
+        list_coordinate[frame + 1, :, :] = load_npz(f'{frame_steps[frame]}.npz')[0]
+
+    print('Загрузка завершена....................................\n'
+          'Идет визуализация....................................')
 
     index_slice = np.arange(0, list_coordinate.shape[0], step=slice_list)
 
