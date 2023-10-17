@@ -32,8 +32,7 @@ def anim(coord):
         plt.pause(0.000000001)
 
 
-route: str = getcwd()
-route: str = 'C:\\Vsykoe\\Math.method\\3 тела'
+route: str = "C:\\Users\\NwoL"
 
 chdir(f'{route}')
 

@@ -4,8 +4,9 @@ from os import path, makedirs, chdir, getcwd
 from typing import Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from numba import prange, njit
-from numpy import zeros, sum, array, arange, where, ndarray, abs, sqrt, append, savez, load, min, zeros_like, int64
+from numpy import zeros, sum, array, arange, where, ndarray, abs, append, savez, load, min, zeros_like, int64
 from numpy.linalg import norm
 from scipy.constants import G, c
 from tqdm import tqdm
@@ -21,20 +22,21 @@ def rk4(time_step: float, mass_coord: ndarray, mass_speed: ndarray, function, ti
 
 def solve(time_solve: float) -> ndarray:
     force: ndarray = zeros((3, 3, 3))
-    for number_i in prange(3):
-        for number_j in prange(3):
+    for number_i in range(3):
+        for number_j in range(3):
             if number_j == number_i:
                 continue
             force[:, number_i, number_j] = gravity_force(coord_first_part=coordinate[:, number_i],
                                                          index_second_part=number_j,
                                                          index_first_part=number_i, time_gravity=time_solve)
-    result_force = sum(force, axis=2)
 
-    return array([
-        result_force[0] / masses,
-        result_force[1] / masses,
-        result_force[2] / masses
-    ])
+    return sum(force, axis=2) / masses
+
+
+def gravity_force(index_first_part: int, coord_first_part: ndarray, index_second_part: int, time_gravity: float):
+    particle = calculate_delay_force(coord_first_part, index_second_part, time_gravity)
+    return 0 if isinstance(particle, int) else G * masses[index_first_part] * masses[index_second_part] / (sum(
+            (particle - coord_first_part) ** 2) ** (3 / 2)) * array(particle - coord_first_part)
 
 
 def calculate_delay_force(first_particle: ndarray, isp: int, time_delay: float) -> Union[int, ndarray]:
@@ -44,11 +46,12 @@ def calculate_delay_force(first_particle: ndarray, isp: int, time_delay: float) 
     change_time: ndarray = abs(timeline - time_delay - tau[-1])
 
     second_particle = 0
-    while tau[-1] - tau[-2] > dt and value < 1e2 and time_delay >= timeline[where(change_time == min(change_time))][0]:
-        if time_delay >= timeline[where(change_time == min(change_time))][0]:
-            second_particle = coordinate[:, isp]
-        else:
-            second_particle = open_particle(isp, timeline[where(change_time == min(change_time))])
+    criterion = where(change_time == min(change_time))
+    t_tau = timeline[criterion]
+    while tau[-1] - tau[-2] > dt and value < NoI and time_delay >= t_tau[0]:
+        second_particle: ndarray = coordinate[:, isp] if time_delay >= t_tau[0] else open_particle(number_particle=isp,
+                                                                                                   time_open=t_tau)
+
         delta_radius: ndarray = second_particle - first_particle
         module_delta_radius: float = norm(delta_radius)
 
@@ -57,24 +60,12 @@ def calculate_delay_force(first_particle: ndarray, isp: int, time_delay: float) 
         value += 1
 
         change_time: ndarray = abs(timeline - time_delay - tau[-1])
-
-    if time_delay == timeline[where(change_time == min(change_time))][0]:
-        second_particle = coordinate[:, isp]
-    elif time_delay > timeline[where(change_time == min(change_time))][0]:
-        second_particle = open_particle(isp, timeline[where(change_time == min(change_time))])
+        criterion = where(change_time == min(change_time))
+        t_tau = timeline[criterion]
     return second_particle
 
 
-def gravity_force(index_first_part: int, coord_first_part: ndarray, index_second_part: int, time_gravity: float):
-    particle = calculate_delay_force(coord_first_part, index_second_part, time_gravity)
-    if type(particle) == int:
-        return 0
-    else:
-        return G * masses[index_first_part] * masses[index_second_part] / (sum(
-            (particle - coord_first_part) ** 2) ** (3 / 2)) * array(particle - coord_first_part)
-
-
-@njit
+@njit(cache=True, nogil=True)
 def open_particle(number_particle, time_open):
     particle: ndarray = load(f'{time_open}.npz')['arr_0'][:, number_particle]
     return particle
@@ -85,8 +76,8 @@ def load_npz(file_name) -> array:
     return particle['arr_0'], particle['arr_1']
 
 
-def anim(coord):
-    for i in tqdm(range(0, len(list_coordinate) - 2)):
+def anim(coord, index_range):
+    for i in tqdm(index_range):
         fig.clf()
         ax = fig.add_subplot(111, projection="3d")
         ax.set_title("Визуализация задачи 3-ех тел с учетом запаздывания сигнала методом РК-4\n", fontsize=14)
@@ -114,7 +105,7 @@ if __name__ == '__main__':
         settings = [line.rstrip() for line in file]
 
     current_time = datetime.now()
-    time_now = str(current_time.strftime("%d-%m-%Y %H %M"))
+    time_now = str(current_time.strftime("%d-%m-%Y %H.%M"))
 
     makedirs(path.join(input_file, time_now), exist_ok=True)
 
@@ -127,7 +118,7 @@ if __name__ == '__main__':
     # Число итераций
     NoI: int = int(settings[1][settings[1].find('=') + 1:])
 
-    timeline: ndarray = arange(0, NoI, 1) * dt
+    timeline: ndarray = arange(0, NoI, 1, dtype=int64) * dt
 
     # Массы планет
     masses: ndarray = array([settings[i][settings[i].find('=') + 1:] for i in [4, 5, 6]], dtype=float)
@@ -161,39 +152,33 @@ if __name__ == '__main__':
 
     savez(f'{int(-1)}', coordinate, speed)
 
-    condition: bool = False
-
-    collection = zeros((NoI, 3, 3))
-
     print('------------------------ Идет просчет ------------------------\n')
 
-    for frame in tqdm(range(len(timeline))):
+    for frame in tqdm(arange(len(timeline))):
         if frame == range(len(timeline))[-1]:
             continue
-        if not condition:
-            coordinate, speed = rk4(time_step=dt,
-                                    mass_coord=coordinate,
-                                    mass_speed=speed,
-                                    function=solve,
-                                    time_rk4=frame * dt)
 
-            collection[frame, :, :] = coordinate
+        coordinate, speed = rk4(time_step=dt,
+                                mass_coord=coordinate,
+                                mass_speed=speed,
+                                function=solve,
+                                time_rk4=frame * dt)
 
-            savez(f'{int(frame * dt)}', coordinate, speed)
+        savez(f'{int(frame * dt)}', coordinate, speed)
 
-            for i in range(3):
-                for j in range(i + 1, 3):
-                    if sum((coordinate[:, i] - coordinate[:, j]) ** 2) ** (1 / 2) <= radii[i] + radii[j]:
-                        condition = True
-                        print(f'Упс 😧😫, планеты {i + 1} и {j + 1} взорвались 😈😈😈😈😈😈😈😈😈😈\nМожете закрывать')
-                        time.sleep(10)
-                        exit()
+        for i in range(3):
+            for j in range(i + 1, 3):
+                if sum((coordinate[:, i] - coordinate[:, j]) ** 2) ** (1 / 2) <= radii[i] + radii[j]:
+                    condition = True
+                    print(f'Упс 😧😫, планеты {i + 1} и {j + 1} взорвались 😈😈😈😈😈😈😈😈😈😈\nМожете закрывать')
+                    time.sleep(10)
+                    exit()
 
     print('Расчет завершен')
     frame_step = dt
 
     slice_list = int(input('\nВведите периодичность вывода кадров (больше - быстрее отрисовывает) type=int '))
-    frame_steps = arange(0, timeline[-1], step=frame_step, dtype=int64)[::slice_list]
+    frame_steps = arange(0, timeline[-1], step=frame_step, dtype=int64)
 
     list_coordinate = zeros((len(frame_steps) + 1, 3, 3))
 
@@ -211,6 +196,8 @@ if __name__ == '__main__':
         list_speed[frame + 1, :, :] = speed
     print('\nИдет визуализация....................................')
 
+    index_slice = np.arange(0, list_coordinate.shape[0], step=slice_list)
+
     fig = plt.figure(figsize=(15, 10))
-    anim(list_coordinate)
+    anim(coord=list_coordinate, index_range=index_slice)
     plt.show()
